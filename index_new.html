@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ID Card Generator</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #eee;
+      padding: 20px;
+      margin: 0;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 40px;
+    }
+
+    .form-section {
+      background: #fff;
+      padding: 10px 15px;
+      border-radius: 8px;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+      width: 320px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .form-section h2 {
+      margin: 0 0 5px 0;
+      font-size: 20px;
+      text-align: center;
+    }
+
+    .form-section input {
+      margin: 0;
+      padding: 6px 8px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+
+    .form-section input:not(:last-of-type) {
+      margin-bottom: 6px;
+    }
+
+    .form-section input[type="file"] {
+      padding: 3px 8px;
+    }
+
+    .form-section div {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 5px;
+    }
+
+    .form-section button {
+      flex: 1;
+      padding: 8px 0;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background-color: #021349;
+      color: white;
+      transition: background-color 0.3s ease;
+    }
+
+    .form-section button:hover {
+      background-color: #0147a5;
+    }
+
+    .id-card {
+      width: 155px;
+      height: 240px;
+      background-size: cover;
+      border: 2px solid #000;
+      padding: 10px;
+      position: relative;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+
+    .photo-box {
+      width: 100px;
+      height: 100px;
+      border: 1px solid #000;
+      position: absolute;
+      top: 47px;
+      left: 38px;
+      background: #ccc;
+      border-radius: 50%;
+      overflow: hidden;
+    }
+
+    .photo-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+    }
+
+    .details, .details-back {
+      position: absolute;
+      left: 20px;
+      text-align: left;
+      font-size: 12px;
+    }
+
+    .details {
+      top: 150px;
+    }
+
+    .details-back {
+      top: 150px;
+    }
+
+    canvas {
+      display: none;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        flex-direction: column;
+        align-items: center;
+        height: auto;
+      }
+
+      .form-section {
+        width: 100%;
+        max-width: 320px;
+      }
+    }
+  </style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+  <div class="form-section">
+    <h2>ID Card Generator</h2>
+    <input type="text" id="name" placeholder="Full Name" required />
+    <input type="text" id="course" placeholder="Course" required/>
+    <input type="text" id="idNumber" placeholder="ID Number" required/>
+    <input type="date" id="joiningDate" required/>
+    <input type="date" id="expiryDate" required/>
+    <input type="file" id="photoInput" accept="image/*" required/>
+
+    <div>
+      <button onclick="changeBackground('art1.png')">CADD</button>
+      <button onclick="changeBackground('art2.png')">DZ</button>
+      <button onclick="changeBackground('art3.png')">Synergy</button>
+      <button onclick="changeBackground('art4.png')">LW</button>
+    </div>
+
+    <div>
+      <button onclick="generateID()">Generate ID Card</button>
+      <button onclick="downloadID()">Download ID Card</button>
+    </div>
+  </div>
+
+  <!-- Front Side Preview -->
+  <div id="cardPreviewFront" class="id-card" style="background-image:url('./art1.png');">
+    <div class="photo-box">
+      <img id="cardPhoto" src="./previewImage.jfif" alt="Photo Preview" />
+    </div>
+    <div class="details">
+      <div><span id="cardName"></span></div>
+      <div><span id="cardCourse"></span></div>
+      <div><span id="cardID"></span></div>
+    </div>
+  </div>
+
+  <!-- Back Side Preview -->
+  <div id="cardPreviewBack" class="id-card" style="background-image:url('./back.png');">
+    <div class="details-back">
+      <div><strong>Join:</strong> <span id="cardJoin"></span></div>
+      <div><strong>Expiry:</strong> <span id="cardExpire"></span></div>
+    </div>
+  </div>
+
+  <canvas id="cardCanvasFront" width="1550" height="2400"></canvas>
+  <canvas id="cardCanvasBack" width="1550" height="2400"></canvas>
+
+  <script>
+    let uploadedPhoto = "";
+    let currentBackgroundSrc = './art1.png';
+
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      const dd = String(date.getDate()).padStart(2, '0');
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const yyyy = date.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+
+    document.getElementById("photoInput").addEventListener("change", function (e) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        uploadedPhoto = e.target.result;
+        document.getElementById("cardPhoto").src = uploadedPhoto;
+      };
+      reader.readAsDataURL(this.files[0]);
+    });
+
+    function changeBackground(newSrc) {
+      currentBackgroundSrc = newSrc;
+      document.getElementById('cardPreviewFront').style.backgroundImage = `url(${newSrc})`;
+    }
+
+    function generateID() {
+      document.getElementById("cardName").innerText = document.getElementById("name").value;
+      document.getElementById("cardCourse").innerText = document.getElementById("course").value;
+      document.getElementById("cardID").innerText = document.getElementById("idNumber").value;
+      document.getElementById("cardJoin").innerText = formatDate(document.getElementById("joiningDate").value);
+      document.getElementById("cardExpire").innerText = formatDate(document.getElementById("expiryDate").value);
+    }
+
+    async function downloadID() {
+      const { jsPDF } = window.jspdf;
+      const frontCanvas = document.getElementById("cardCanvasFront");
+      const backCanvas = document.getElementById("cardCanvasBack");
+      const ctxF = frontCanvas.getContext("2d");
+      const ctxB = backCanvas.getContext("2d");
+
+      const bgFront = new Image();
+      bgFront.crossOrigin = "anonymous";
+      bgFront.onload = function () {
+        ctxF.clearRect(0, 0, frontCanvas.width, frontCanvas.height);
+        ctxF.drawImage(bgFront, 0, 0, frontCanvas.width, frontCanvas.height);
+
+        const img = new Image();
+        img.onload = function () {
+          const x = 345, y = 422, size = 905, cx = x + size / 2, cy = y + size / 2, radius = size / 2;
+
+          ctxF.save();
+          ctxF.beginPath();
+          ctxF.arc(cx, cy, radius, 0, Math.PI * 2);
+          ctxF.clip();
+          ctxF.drawImage(img, x, y, size, size);
+          ctxF.restore();
+
+          ctxF.strokeStyle = "#000";
+          ctxF.lineWidth = 5;
+          ctxF.beginPath();
+          ctxF.arc(cx, cy, radius, 0, Math.PI * 2);
+          ctxF.stroke();
+
+          ctxF.fillStyle = "#021349";
+          ctxF.font = "bold 160px Arial";
+          ctxF.fillText(document.getElementById("name").value, 145, 1595);
+
+          ctxF.fillStyle = "#FFC315";
+          ctxF.font = "bold 75px Arial";
+          ctxF.fillText(document.getElementById("course").value, 145, 1680);
+
+          ctxF.fillStyle = "#021349";
+          ctxF.font = "normal 70px Arial";
+          ctxF.fillText(document.getElementById("idNumber").value, 145, 1800);
+
+          // Back side
+          const bgBack = new Image();
+          bgBack.onload = function () {
+            ctxB.clearRect(0, 0, backCanvas.width, backCanvas.height);
+            ctxB.drawImage(bgBack, 0, 0, backCanvas.width, backCanvas.height);
+
+            ctxB.fillStyle = "#021349";
+            ctxB.font = "bold 80px Arial";
+            const joinFormatted = formatDate(document.getElementById("joiningDate").value);
+            const expiryFormatted = formatDate(document.getElementById("expiryDate").value);
+            ctxB.fillText("Join: " + joinFormatted, 150, 1400);
+            ctxB.fillText("Expiry: " + expiryFormatted, 150, 1480);
+
+            const pdf = new jsPDF({
+              orientation: 'portrait',
+              unit: 'pt',
+              format: [frontCanvas.width * 0.75, frontCanvas.height * 0.75],
+            });
+
+            pdf.addImage(frontCanvas.toDataURL("image/png"), 'PNG', 0, 0, frontCanvas.width * 0.75, frontCanvas.height * 0.75);
+            pdf.addPage();
+            pdf.addImage(backCanvas.toDataURL("image/png"), 'PNG', 0, 0, backCanvas.width * 0.75, backCanvas.height * 0.75);
+
+            const nameVal = document.getElementById("name").value.trim().replace(/\s+/g, '');
+            const joinDate = new Date(document.getElementById("joiningDate").value);
+            const dd = String(joinDate.getDate()).padStart(2, '0');
+            const mm = String(joinDate.getMonth() + 1).padStart(2, '0');
+            const yyyy = joinDate.getFullYear();
+            const filename = `${nameVal.substring(0, 4).toUpperCase()}_${dd}_${mm}_${yyyy}.pdf`;
+
+            pdf.save(filename);
+          };
+          bgBack.src = './back.png';
+        };
+        img.src = uploadedPhoto || "./previewImage.jfif";
+      };
+      bgFront.src = currentBackgroundSrc;
+    }
+  </script>
+
+</body>
+</html>
