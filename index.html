@@ -175,7 +175,7 @@
   </div>
 
   <!-- Back Side Preview -->
-  <div id="cardPreviewBack" class="id-card" style="background-image:url('./back.png');">
+  <div id="cardPreviewBack" class="id-card" style="background-image:url('./caddlms.png');">
     <div class="details-back">
       <div><strong>Join:</strong> <span id="cardJoin"></span></div>
       <div><strong>Expiry:</strong> <span id="cardExpire"></span></div>
@@ -188,6 +188,14 @@
   <script>
     let uploadedPhoto = "";
     let currentBackgroundSrc = './art1.png';
+    let currentBackBackgroundSrc = './caddlms.png';
+
+    const backgroundMap = {
+      'art1.png': 'caddlms.png',
+      'art2.png': 'dreamzone.png',
+      'art3.png': 'synergy.png',
+      'art4.png': 'livewire.png'
+    };
 
     function formatDate(dateStr) {
       const date = new Date(dateStr);
@@ -209,6 +217,10 @@
     function changeBackground(newSrc) {
       currentBackgroundSrc = newSrc;
       document.getElementById('cardPreviewFront').style.backgroundImage = `url(${newSrc})`;
+
+      const backSrc = backgroundMap[newSrc] || 'back.png';
+      currentBackBackgroundSrc = backSrc;
+      document.getElementById('cardPreviewBack').style.backgroundImage = `url(${backSrc})`;
     }
 
     function generateID() {
@@ -261,7 +273,6 @@
           ctxF.font = "normal 70px Arial";
           ctxF.fillText(document.getElementById("idNumber").value, 145, 1800);
 
-          // Back side
           const bgBack = new Image();
           bgBack.onload = function () {
             ctxB.clearRect(0, 0, backCanvas.width, backCanvas.height);
@@ -293,7 +304,7 @@
 
             pdf.save(filename);
           };
-          bgBack.src = './back.png';
+          bgBack.src = currentBackBackgroundSrc;
         };
         img.src = uploadedPhoto || "./previewImage.jfif";
       };
