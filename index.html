@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>ID Card Generator</title>
@@ -15,11 +16,18 @@
       gap: 40px;
     }
 
+    .form-section button.active {
+      background-color: #FFC315;
+      color: #021349;
+      font-weight: bold;
+    }
+
+
     .form-section {
       background: #fff;
       padding: 10px 15px;
       border-radius: 8px;
-      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+      box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
       width: 320px;
       box-sizing: border-box;
       display: flex;
@@ -80,7 +88,7 @@
       border: 2px solid #000;
       padding: 10px;
       position: relative;
-      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+      box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
       flex-shrink: 0;
     }
 
@@ -103,7 +111,8 @@
       border-radius: 50%;
     }
 
-    .details, .details-back {
+    .details,
+    .details-back {
       position: absolute;
       left: 20px;
       text-align: left;
@@ -136,30 +145,39 @@
     }
   </style>
 
+  <!-- jsPDF library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- PapaParse library for CSV parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 </head>
+
 <body>
 
   <div class="form-section">
     <h2>ID Card Generator</h2>
+    <!-- Fields for single card generation -->
     <input type="text" id="name" placeholder="Full Name" required />
-    <input type="text" id="course" placeholder="Course" required/>
-    <input type="text" id="idNumber" placeholder="ID Number" required/>
-    <input type="date" id="joiningDate" required/>
-    <input type="date" id="expiryDate" required/>
-    <input type="file" id="photoInput" accept="image/*" required/>
-
+    <input type="text" id="course" placeholder="Course" required />
+    <input type="text" id="idNumber" placeholder="ID Number" required />
+    <input type="date" id="joiningDate" required />
+    <input type="date" id="expiryDate" required />
+    <input type="file" id="photoInput" accept="image/*" required />
     <div>
-      <button onclick="changeBackground('art1.png')">CADD</button>
-      <button onclick="changeBackground('art2.png')">DZ</button>
-      <button onclick="changeBackground('art3.png')">Synergy</button>
-      <button onclick="changeBackground('art4.png')">LW</button>
+      <button onclick="changeBackground('art1.png', this)">CADD</button>
+      <button onclick="changeBackground('art2.png', this)">DZ</button>
+      <button onclick="changeBackground('art3.png', this)">Synergy</button>
+      <button onclick="changeBackground('art4.png', this)">LW</button>
     </div>
 
     <div>
       <button onclick="generateID()">Generate ID Card</button>
       <button onclick="downloadID()">Download ID Card</button>
     </div>
+    <hr style="margin: 10px 0;">
+    <!-- CSV Bulk Upload Section -->
+    <input type="file" id="csvInput" accept=".csv" />
+    <button onclick="downloadTemplate()" style="width: 100%; margin-top: 5px;">Get Template</button>
+    <button onclick="processCSV()" style="width: 100%; margin-top: 5px;">Generate Bulk PDF</button>
   </div>
 
   <!-- Front Side Preview -->
@@ -186,6 +204,7 @@
   <canvas id="cardCanvasBack" width="1550" height="2400"></canvas>
 
   <script>
+    // Global variables for preview and background images
     let uploadedPhoto = "";
     let currentBackgroundSrc = './art1.png';
     let currentBackBackgroundSrc = './caddlms.png';
@@ -205,6 +224,7 @@
       return `${dd}/${mm}/${yyyy}`;
     }
 
+    // Photo preview for single card
     document.getElementById("photoInput").addEventListener("change", function (e) {
       const reader = new FileReader();
       reader.onload = function (e) {
@@ -214,15 +234,23 @@
       reader.readAsDataURL(this.files[0]);
     });
 
-    function changeBackground(newSrc) {
+    function changeBackground(newSrc, buttonElement) {
       currentBackgroundSrc = newSrc;
       document.getElementById('cardPreviewFront').style.backgroundImage = `url(${newSrc})`;
-
       const backSrc = backgroundMap[newSrc] || 'back.png';
       currentBackBackgroundSrc = backSrc;
       document.getElementById('cardPreviewBack').style.backgroundImage = `url(${backSrc})`;
+
+      // Clear active state from all background buttons
+      const bgButtons = document.querySelectorAll('.form-section div:nth-of-type(1) button');
+      bgButtons.forEach(btn => btn.classList.remove('active'));
+
+      // Set active state to the clicked button
+      buttonElement.classList.add('active');
     }
 
+
+    // Generates single ID card preview from the input fields
     function generateID() {
       document.getElementById("cardName").innerText = document.getElementById("name").value;
       document.getElementById("cardCourse").innerText = document.getElementById("course").value;
@@ -231,6 +259,7 @@
       document.getElementById("cardExpire").innerText = formatDate(document.getElementById("expiryDate").value);
     }
 
+    // Single card PDF download (front & back) generation
     async function downloadID() {
       const { jsPDF } = window.jspdf;
       const frontCanvas = document.getElementById("cardCanvasFront");
@@ -238,79 +267,237 @@
       const ctxF = frontCanvas.getContext("2d");
       const ctxB = backCanvas.getContext("2d");
 
-      const bgFront = new Image();
-      bgFront.crossOrigin = "anonymous";
-      bgFront.onload = function () {
-        ctxF.clearRect(0, 0, frontCanvas.width, frontCanvas.height);
-        ctxF.drawImage(bgFront, 0, 0, frontCanvas.width, frontCanvas.height);
+      const bgFront = await loadImageAsync(currentBackgroundSrc);
+      ctxF.clearRect(0, 0, frontCanvas.width, frontCanvas.height);
+      ctxF.drawImage(bgFront, 0, 0, frontCanvas.width, frontCanvas.height);
 
+      const img = await loadImageAsync(uploadedPhoto || "./previewImage.jfif");
+      // Draw circular photo
+      const x = 345, y = 422, size = 905;
+      const cx = x + size / 2, cy = y + size / 2, radius = size / 2;
+      ctxF.save();
+      ctxF.beginPath();
+      ctxF.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctxF.clip();
+      ctxF.drawImage(img, x, y, size, size);
+      ctxF.restore();
+
+      ctxF.strokeStyle = "#000";
+      ctxF.lineWidth = 5;
+      ctxF.beginPath();
+      ctxF.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctxF.stroke();
+
+      ctxF.fillStyle = "#021349";
+      ctxF.font = "bold 160px Arial";
+      ctxF.fillText(document.getElementById("name").value, 145, 1595);
+
+      ctxF.fillStyle = "#FFC315";
+      ctxF.font = "bold 75px Arial";
+      ctxF.fillText(document.getElementById("course").value, 145, 1680);
+
+      ctxF.fillStyle = "#021349";
+      ctxF.font = "normal 70px Arial";
+      ctxF.fillText(document.getElementById("idNumber").value, 145, 1800);
+
+      const bgBack = await loadImageAsync(currentBackBackgroundSrc);
+      ctxB.clearRect(0, 0, backCanvas.width, backCanvas.height);
+      ctxB.drawImage(bgBack, 0, 0, backCanvas.width, backCanvas.height);
+
+      ctxB.fillStyle = "#021349";
+      ctxB.font = "bold 80px Arial";
+      const joinFormatted = formatDate(document.getElementById("joiningDate").value);
+      const expiryFormatted = formatDate(document.getElementById("expiryDate").value);
+      ctxB.fillText("Join: " + joinFormatted, 150, 1400);
+      ctxB.fillText("Expiry: " + expiryFormatted, 150, 1480);
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: [frontCanvas.width * 0.75, frontCanvas.height * 0.75],
+      });
+
+      pdf.addImage(frontCanvas.toDataURL("image/png"), 'PNG', 0, 0, frontCanvas.width * 0.75, frontCanvas.height * 0.75);
+      pdf.addPage();
+      pdf.addImage(backCanvas.toDataURL("image/png"), 'PNG', 0, 0, backCanvas.width * 0.75, backCanvas.height * 0.75);
+
+      const nameVal = document.getElementById("name").value.trim().replace(/\s+/g, '');
+      const joinDate = new Date(document.getElementById("joiningDate").value);
+      const dd = String(joinDate.getDate()).padStart(2, '0');
+      const mm = String(joinDate.getMonth() + 1).padStart(2, '0');
+      const yyyy = joinDate.getFullYear();
+      const filename = `${nameVal.substring(0, 4).toUpperCase()}_${dd}_${mm}_${yyyy}.pdf`;
+
+      pdf.save(filename);
+    }
+
+    // Helper function to load an image and return a promise
+    function loadImageAsync(src) {
+      return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = function () {
-          const x = 345, y = 422, size = 905, cx = x + size / 2, cy = y + size / 2, radius = size / 2;
+        img.crossOrigin = "anonymous";
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("Failed to load image: " + src));
+        img.src = src;
+      });
+    }
 
-          ctxF.save();
-          ctxF.beginPath();
-          ctxF.arc(cx, cy, radius, 0, Math.PI * 2);
-          ctxF.clip();
-          ctxF.drawImage(img, x, y, size, size);
-          ctxF.restore();
+    // --------------------------
+    // CSV Bulk Processing Section
+    // --------------------------
 
-          ctxF.strokeStyle = "#000";
-          ctxF.lineWidth = 5;
-          ctxF.beginPath();
-          ctxF.arc(cx, cy, radius, 0, Math.PI * 2);
-          ctxF.stroke();
+    // Dimensions and scale for card canvases
+    const canvasWidth = 1550, canvasHeight = 2400, scaleFactor = 0.75;
 
-          ctxF.fillStyle = "#021349";
-          ctxF.font = "bold 160px Arial";
-          ctxF.fillText(document.getElementById("name").value, 145, 1595);
+    // Generates the front and back card images for one student.
+    async function generateCard(student) {
+      // Create offscreen canvases for front and back sides
+      const frontCanvas = document.createElement('canvas');
+      frontCanvas.width = canvasWidth;
+      frontCanvas.height = canvasHeight;
+      const ctxF = frontCanvas.getContext("2d");
 
-          ctxF.fillStyle = "#FFC315";
-          ctxF.font = "bold 75px Arial";
-          ctxF.fillText(document.getElementById("course").value, 145, 1680);
+      const backCanvas = document.createElement('canvas');
+      backCanvas.width = canvasWidth;
+      backCanvas.height = canvasHeight;
+      const ctxB = backCanvas.getContext("2d");
 
-          ctxF.fillStyle = "#021349";
-          ctxF.font = "normal 70px Arial";
-          ctxF.fillText(document.getElementById("idNumber").value, 145, 1800);
+      // --- Front Side ---
+      const bgFront = await loadImageAsync(currentBackgroundSrc);
+      ctxF.clearRect(0, 0, canvasWidth, canvasHeight);
+      ctxF.drawImage(bgFront, 0, 0, canvasWidth, canvasHeight);
 
-          const bgBack = new Image();
-          bgBack.onload = function () {
-            ctxB.clearRect(0, 0, backCanvas.width, backCanvas.height);
-            ctxB.drawImage(bgBack, 0, 0, backCanvas.width, backCanvas.height);
+      // Load student photo (fallback image if student.photo is blank)
+      let photoSrc = student.photo && student.photo.trim() ? student.photo.trim() : "./previewImage.jfif";
+      const photoImg = await loadImageAsync(photoSrc);
 
-            ctxB.fillStyle = "#021349";
-            ctxB.font = "bold 80px Arial";
-            const joinFormatted = formatDate(document.getElementById("joiningDate").value);
-            const expiryFormatted = formatDate(document.getElementById("expiryDate").value);
-            ctxB.fillText("Join: " + joinFormatted, 150, 1400);
-            ctxB.fillText("Expiry: " + expiryFormatted, 150, 1480);
+      // Coordinates for circular photo (using values as in single card generation)
+      const x = 345, y = 422, size = 905;
+      const cx = x + size / 2, cy = y + size / 2, radius = size / 2;
+      ctxF.save();
+      ctxF.beginPath();
+      ctxF.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctxF.clip();
+      ctxF.drawImage(photoImg, x, y, size, size);
+      ctxF.restore();
 
-            const pdf = new jsPDF({
-              orientation: 'portrait',
-              unit: 'pt',
-              format: [frontCanvas.width * 0.75, frontCanvas.height * 0.75],
-            });
+      ctxF.strokeStyle = "#000";
+      ctxF.lineWidth = 5;
+      ctxF.beginPath();
+      ctxF.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctxF.stroke();
 
-            pdf.addImage(frontCanvas.toDataURL("image/png"), 'PNG', 0, 0, frontCanvas.width * 0.75, frontCanvas.height * 0.75);
-            pdf.addPage();
-            pdf.addImage(backCanvas.toDataURL("image/png"), 'PNG', 0, 0, backCanvas.width * 0.75, backCanvas.height * 0.75);
+      // Text styles and positions for front side
+      ctxF.fillStyle = "#021349";
+      ctxF.font = "bold 160px Arial";
+      ctxF.fillText(student.name, 145, 1595);
 
-            const nameVal = document.getElementById("name").value.trim().replace(/\s+/g, '');
-            const joinDate = new Date(document.getElementById("joiningDate").value);
-            const dd = String(joinDate.getDate()).padStart(2, '0');
-            const mm = String(joinDate.getMonth() + 1).padStart(2, '0');
-            const yyyy = joinDate.getFullYear();
-            const filename = `${nameVal.substring(0, 4).toUpperCase()}_${dd}_${mm}_${yyyy}.pdf`;
+      ctxF.fillStyle = "#FFC315";
+      ctxF.font = "bold 75px Arial";
+      ctxF.fillText(student.course, 145, 1680);
 
-            pdf.save(filename);
-          };
-          bgBack.src = currentBackBackgroundSrc;
-        };
-        img.src = uploadedPhoto || "./previewImage.jfif";
+      ctxF.fillStyle = "#021349";
+      ctxF.font = "normal 70px Arial";
+      ctxF.fillText(student.idNumber, 145, 1800);
+
+      // --- Back Side ---
+      const bgBack = await loadImageAsync(currentBackBackgroundSrc);
+      ctxB.clearRect(0, 0, canvasWidth, canvasHeight);
+      ctxB.drawImage(bgBack, 0, 0, canvasWidth, canvasHeight);
+
+      ctxB.fillStyle = "#021349";
+      ctxB.font = "bold 80px Arial";
+      const joinFormatted = formatDate(student.joiningDate);
+      const expiryFormatted = formatDate(student.expiryDate);
+      ctxB.fillText("Join: " + joinFormatted, 150, 1400);
+      ctxB.fillText("Expiry: " + expiryFormatted, 150, 1480);
+
+      // Return data URLs for the two sides
+      return {
+        frontDataUrl: frontCanvas.toDataURL("image/png"),
+        backDataUrl: backCanvas.toDataURL("image/png")
       };
-      bgFront.src = currentBackgroundSrc;
+    }
+
+    // Process CSV data and generate a multipage PDF with each student's ID cards
+    async function processCSV() {
+      const file = document.getElementById('csvInput').files[0];
+      if (!file) {
+        alert('Please select a CSV file first.');
+        return;
+      }
+
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async function (results) {
+          const students = results.data;  // Each row should have: name, course, idNumber, joiningDate, expiryDate, photo
+          if (!students.length) {
+            alert("No student data found in CSV.");
+            return;
+          }
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'pt',
+            format: [canvasWidth * scaleFactor, canvasHeight * scaleFactor],
+          });
+
+          // Loop through each student and add two pages (front and back) to the PDF
+          for (let i = 0; i < students.length; i++) {
+            const student = students[i];
+            // Trim spaces from values if needed
+            student.name = student.name.trim();
+            student.course = student.course.trim();
+            student.idNumber = student.idNumber.trim();
+            // Assume joiningDate and expiryDate are in a format that new Date() understands
+            student.joiningDate = student.joiningDate;
+            student.expiryDate = student.expiryDate;
+            student.photo = student.photo;
+
+            try {
+              const cardData = await generateCard(student);
+
+              // Add front side: for the first student add image on the initial page; for others, add a new page first.
+              if (i === 0) {
+                pdf.addImage(cardData.frontDataUrl, 'PNG', 0, 0, canvasWidth * scaleFactor, canvasHeight * scaleFactor);
+              } else {
+                pdf.addPage();
+                pdf.addImage(cardData.frontDataUrl, 'PNG', 0, 0, canvasWidth * scaleFactor, canvasHeight * scaleFactor);
+              }
+              // Add back side on a new page.
+              pdf.addPage();
+              pdf.addImage(cardData.backDataUrl, 'PNG', 0, 0, canvasWidth * scaleFactor, canvasHeight * scaleFactor);
+            } catch (err) {
+              console.error("Error generating card for", student.name, err);
+            }
+          }
+
+          // Save the bulk PDF file – filename includes current timestamp
+          pdf.save("Bulk_ID_Cards_" + Date.now() + ".pdf");
+        },
+        error: function (error) {
+          alert("Error parsing CSV: " + error);
+        }
+      });
+    }
+
+    function downloadTemplate() {
+      const templateData = `name,course,idNumber,joiningDate,expiryDate,photo
+John Doe,Computer Science,12345,2023-01-01,2024-01-01,c:/icardphotos/photo1.jpg
+Jane Smith,Mathematics,67890,2023-02-01,2024-02-01,c:/icardphotos/photo2.jpg
+`;
+      const blob = new Blob([templateData], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'ID_Card_Template.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
   </script>
 
 </body>
+
 </html>
