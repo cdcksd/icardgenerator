@@ -154,31 +154,39 @@
 <body>
 
   <div class="form-section">
-    <h2>ID Card Generator</h2>
-    <!-- Fields for single card generation -->
-    <input type="text" id="name" placeholder="Full Name" required />
-    <input type="text" id="course" placeholder="Course" required />
-    <input type="text" id="idNumber" placeholder="ID Number" required />
-    <input type="date" id="joiningDate" required />
-    <input type="date" id="expiryDate" required />
-    <input type="file" id="photoInput" accept="image/*" required />
-    <div>
-      <button onclick="changeBackground('art1.png', this)">CADD</button>
-      <button onclick="changeBackground('art2.png', this)">DZ</button>
-      <button onclick="changeBackground('art3.png', this)">Synergy</button>
-      <button onclick="changeBackground('art4.png', this)">LW</button>
-    </div>
+  <h2>ID Card Generator</h2>
 
-    <div>
-      <button onclick="generateID()">Generate ID Card</button>
-      <button onclick="downloadID()">Download ID Card</button>
-    </div>
-    <hr style="margin: 10px 0;">
-    <!-- CSV Bulk Upload Section -->
-    <input type="file" id="csvInput" accept=".csv" />
-    <button onclick="downloadTemplate()" style="width: 100%; margin-top: 5px;">Get Template</button>
-    <button onclick="processCSV()" style="width: 100%; margin-top: 5px;">Generate Bulk PDF</button>
+  <!-- Font Size Slider -->
+  <label for="fontSizeSlider">Font Size: <span id="fontSizeValue">120</span></label>
+  <input type="range" id="fontSizeSlider" min="25" max="160" value="120" style="width: 100%; margin-bottom: 10px;">
+
+  <!-- Fields for single card generation -->
+  <input type="text" id="name" placeholder="Full Name" required />
+  <input type="text" id="course" placeholder="Course" required />
+  <input type="text" id="idNumber" placeholder="ID Number" required />
+  <input type="date" id="joiningDate" required />
+  <input type="date" id="expiryDate" required />
+  <input type="file" id="photoInput" accept="image/*" required />
+
+  <div>
+    <button onclick="changeBackground('art1.png', this)">CADD</button>
+    <button onclick="changeBackground('art2.png', this)">DZ</button>
+    <button onclick="changeBackground('art3.png', this)">Synergy</button>
+    <button onclick="changeBackground('art4.png', this)">LW</button>
   </div>
+
+  <div>
+    <button onclick="generateID()">Generate ID Card</button>
+    <button onclick="downloadID()">Download ID Card</button>
+  </div>
+
+  <hr style="margin: 10px 0;">
+
+  <!-- CSV Bulk Upload Section -->
+  <input type="file" id="csvInput" accept=".csv" />
+  <button onclick="downloadTemplate()" style="width: 100%; margin-top: 5px;">Get Template</button>
+  <button onclick="processCSV()" style="width: 100%; margin-top: 5px;">Generate Bulk PDF</button>
+</div>
 
   <!-- Front Side Preview -->
   <div id="cardPreviewFront" class="id-card" style="background-image:url('./art1.png');">
@@ -208,6 +216,8 @@
     let uploadedPhoto = "";
     let currentBackgroundSrc = './art1.png';
     let currentBackBackgroundSrc = './caddlms.png';
+
+    let fontSizeforName = 70;
 
     const backgroundMap = {
       'art1.png': 'caddlms.png',
@@ -289,7 +299,7 @@
       ctxF.stroke();
 
       ctxF.fillStyle = "#021349";
-      ctxF.font = "bold 160px Arial";
+      ctxF.font = `bold ${fontSizeforName}px Arial`;
       ctxF.fillText(document.getElementById("name").value, 145, 1595);
 
       ctxF.fillStyle = "#FFC315";
@@ -389,7 +399,8 @@
 
       // Text styles and positions for front side
       ctxF.fillStyle = "#021349";
-      ctxF.font = "bold 160px Arial";
+      ctxF.font = `bold ${fontSizeforName}px Arial`;
+      console.log(fontSizeforName)
       ctxF.fillText(student.name, 145, 1595);
 
       ctxF.fillStyle = "#FFC315";
@@ -496,6 +507,20 @@ Jane Smith,Mathematics,67890,2023-02-01,2024-02-01,c:/icardphotos/photo2.jpg
       a.click();
       document.body.removeChild(a);
     }
+
+    // Font Size Slider Logic
+  const fontSizeSlider = document.getElementById("fontSizeSlider");
+  const fontSizeValue = document.getElementById("fontSizeValue");
+
+  fontSizeSlider.addEventListener("input", () => {
+    const size = fontSizeSlider.value;
+    fontSizeforName = fontSizeSlider.value
+    fontSizeValue.textContent = size;
+    const idCardPreview = document.getElementById("idCardPreview");
+    if (idCardPreview) {
+      idCardPreview.style.fontSize = `${size}%`;
+    }
+  });
   </script>
 
 </body>
